@@ -1,0 +1,77 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL") 
+}
+
+model Cliente {
+  id        Int      @id @default(autoincrement())
+  nombre    String
+  email     String?
+  telefono  String?
+  direccion String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  ventas    Venta[]
+  historial Historial[]
+
+  @@map("clientes")
+}
+
+model Botella {
+  id          Int      @id @default(autoincrement())
+  nombre      String
+  tamano      String
+  color       String
+  forma       String
+  material    String?
+  precioBase  Float    @map("precio_base")
+  descripcion String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  ventas      Venta[]
+  historial Historial[]
+
+  @@map("botellas")
+}
+
+enum EstadoVenta {
+  registrado
+  en_produccion
+  en_envio
+}
+
+model Venta {
+  id          Int         @id @default(autoincrement())
+  clienteId   Int         @map("cliente_id")
+  botellaId   Int         @map("botella_id")
+  cantidad    Int         @default(1)
+  precioTotal Float       @map("precio_total")
+  estado      EstadoVenta @default(registrado)
+  notas       String?
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  cliente     Cliente     @relation(fields: [clienteId], references: [id])
+  botella     Botella     @relation(fields: [botellaId], references: [id])
+
+  @@map("ventas")
+}
+
+model Historial {
+  id          Int      @id @default(autoincrement())
+  clienteId   Int      @map("cliente_id")
+  botellaId   Int      @map("botella_id")
+  cantidad    Int
+  precioTotal Float    @map("precio_total")
+  notas       String?
+  entregadoAt DateTime @default(now()) @map("entregado_at")
+
+  cliente     Cliente  @relation(fields: [clienteId], references: [id])
+  botella     Botella  @relation(fields: [botellaId], references: [id])
+
+  @@map("historial")
+}

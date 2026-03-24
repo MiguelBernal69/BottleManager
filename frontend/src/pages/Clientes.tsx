@@ -41,7 +41,7 @@ export default function Clientes() {
         <Button onClick={openCreate}>+ Nuevo cliente</Button>
       </div>
 
-      <Input placeholder="Buscar por nombre..." value={search} onChange={e => setSearch(e.target.value)} className="max-w-xs" />
+      <Input placeholder="Buscar por nombre..." value={search} onChange={e => setSearch(e.target.value)} className="max-w-xs rounded-md" />
 
       <Card>
         <CardContent className="p-0">
@@ -63,8 +63,12 @@ export default function Clientes() {
                   <td className="px-4 py-3 text-gray-500">{c.telefono ?? '—'}</td>
                   <td className="px-4 py-3 text-gray-500">{c.direccion ?? '—'}</td>
                   <td className="px-4 py-3 flex gap-2">
-                    <Button size="sm" variant="outline" onClick={() => openEdit(c)}>Editar</Button>
-                    <Button size="sm" variant="destructive" onClick={() => handleDelete(c.id)}>Eliminar</Button>
+                    <Button size="sm"
+                      className='bg-blue-500 hover:bg-blue-600 text-white rounded-md'
+                      variant="outline" onClick={() => openEdit(c)}>Editar</Button>
+                    <Button size="sm"
+                      className='bg-red-500 hover:bg-red-600 text-white rounded-md'
+                       variant="destructive" onClick={() => handleDelete(c.id)}>Eliminar</Button>
                   </td>
                 </tr>
               ))}
@@ -77,15 +81,16 @@ export default function Clientes() {
       </Card>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-lg bg-white">
           <DialogHeader>
-            <DialogTitle>{editing ? 'Editar cliente' : 'Nuevo cliente'}</DialogTitle>
+            <DialogTitle className='text-base'>{editing ? 'Editar cliente' : 'Nuevo cliente'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 mt-2">
             {(['nombre', 'email', 'telefono', 'direccion'] as const).map(field => (
               <div key={field}>
-                <Label className="capitalize">{field}</Label>
-                <Input value={form[field]} onChange={e => setForm({ ...form, [field]: e.target.value })} />
+                <Label className="capitalize text-gray-900 text-sm">{field}</Label>
+                <Input className='rounded-md border-gray-400 hover:border-gray-500 focus:ring-2 focus:ring-blue-500' 
+                  value={form[field]} onChange={e => setForm({ ...form, [field]: e.target.value })} />
               </div>
             ))}
             <Button className="w-full mt-2" onClick={handleSubmit}>

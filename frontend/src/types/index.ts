@@ -8,51 +8,79 @@ export interface Cliente {
   updatedAt: string
 }
 
-export interface Botella {
+export interface Producto {
   id: number
   nombre: string
-  tamano: string
-  color: string
-  forma: string
-  material?: string
-  precioBase: number
   descripcion?: string
   createdAt: string
   updatedAt: string
+  variantes: VarianteProducto[]
 }
 
-export type EstadoVenta = 'registrado' | 'en_produccion' | 'en_envio'
+export interface VarianteProducto {
+  id: number
+  productoId: number
+  tamanoMl: number
+  material: string
+  tipo: string
+  cantidadPaquete: number
+  precioSinFactura: string
+  precioConFactura: string
+  producto?: Producto
+}
 
-export interface Venta {
+export type EstadoPedido = 'pendiente' | 'en_produccion' | 'en_envio'
+
+export interface Personalizacion {
+  id?: number
+  tipo: string
+  valor: string
+}
+
+export interface Pedido {
   id: number
   clienteId: number
-  botellaId: number
+  varianteId: number
   cantidad: number
-  precioTotal: number
-  estado: EstadoVenta
+  precioUnitario: string
+  estado: EstadoPedido
   notas?: string
   createdAt: string
   updatedAt: string
   cliente: Cliente
-  botella: Botella
+  variante: VarianteProducto & { producto: Producto }
+  personalizaciones: Personalizacion[]
 }
+
 
 export interface DashboardData {
   totalClientes: number
-  totalVentas: number
-  ingresoTotal: number
-  porEstado: { estado: EstadoVenta; _count: { id: number }; _sum: { precioTotal: number } }[]
-  ventasRecientes: Venta[]
+  totalPedidos: number
+  pedidosPorEstado: { estado: string; _count: { id: number } }[]
+  pedidosRecientes: Pedido[]
+  totalHistorial: number
 }
 
 export interface HistorialItem {
   id: number
-  clienteId: number
-  botellaId: number
-  cantidad: number
-  precioTotal: number
-  notas?: string
+  pedidoId: number
+  clienteId?: number
+  pedidoData: any
+  totalSinFactura: string
+  totalConFactura: string
+  estadoFinal: string
   entregadoAt: string
-  cliente: Cliente
-  botella: Botella
+  clienteNombre?: string
+}
+
+export interface DashboardData {
+  totalClientes: number
+  totalPedidos: number
+  totalHistorial: number
+  ingresoTotalSinFactura: number
+  ingresoTotalConFactura: number
+  pedidosPorEstado: { estado: string; _count: { id: number } }[]
+  pedidosRecientes: Pedido[]
+  graficoIngresos: { mes: string; sinFactura: number; conFactura: number }[]
+  ultimasEntregas: HistorialItem[]
 }

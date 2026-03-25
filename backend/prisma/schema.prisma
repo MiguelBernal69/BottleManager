@@ -4,74 +4,157 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL") 
+  url      = env("DATABASE_URL")
+}
+
+enum EstadoPedido {
+  pendiente
+  en_produccion
+  en_envio
+  entregado
+  cancelado
+}
+
+enum DepartamentoE {
+  cochabamba
+  santa_cruz
+  pando
+  beni
+  la_paz
+  oruro
+  potosi
+  sucre
+  tarija
+}
+
+enum Pago {
+  qr
+  al_contado
+  credito
 }
 
 model Cliente {
-  id        Int      @id @default(autoincrement())
-  nombre    String
-  email     String?
+  id        Int       @id @default(autoincrement())
+  empresa    String
+  nombreCliente     String?
   telefono  String?
   direccion String?
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-  ventas    Venta[]
-  historial Historial[]
+  departamento DepartamentoE? @default(cochabamba)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  pedidos   Pedido[]
 
   @@map("clientes")
 }
 
-model Botella {
-  id          Int      @id @default(autoincrement())
+model Producto {
+  id          Int                @id @default(autoincrement())
   nombre      String
-  tamano      String
-  color       String
-  forma       String
-  material    String?
-  precioBase  Float    @map("precio_base")
   descripcion String?
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-  ventas      Venta[]
-  historial Historial[]
+  createdAt   DateTime           @default(now()) @map("created_at")
+  updatedAt   DateTime           @updatedAt @map("updated_at")
 
-  @@map("botellas")
+  variantes   VarianteProducto[]
+
+  @@map("productos")
 }
 
-enum EstadoVenta {
-  registrado
-  en_produccion
-  en_envio
+model VarianteProducto {
+  id               Int       @id @default(autoincrement())
+  productoId       Int       @map("producto_id")
+  tamanoMl         Int       @map("tamano_ml")
+  material         String
+  tipo             String
+  cantidadPaquete  Int       @map("cantidad_paquete")
+  precioSinFactura Decimal   @map("precio_sin_factura") @db.Decimal(10, 2)
+  precioConFactura Decimal   @map("precio_con_factura") @db.Decimal(10, 2)
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  producto         Producto  @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  pedidos          Pedido[]
+
+  @@unique([productoId, tamanoMl, material, tipo, cantidadPaquete])
+  @@map("variantes_producto")
 }
 
-model Venta {
-  id          Int         @id @default(autoincrement())
-  clienteId   Int         @map("cliente_id")
-  botellaId   Int         @map("botella_id")
-  cantidad    Int         @default(1)
-  precioTotal Float       @map("precio_total")
-  estado      EstadoVenta @default(registrado)
-  notas       String?
-  createdAt   DateTime    @default(now()) @map("created_at")
-  updatedAt   DateTime    @updatedAt @map("updated_at")
+model Pedido {
+  id               Int              @id @default(autoincrement())
+  clienteId        Int              @map("cliente_id")
+  varianteId       Int              @map("variante_id")
+  cantidad         Int
+  precioUnitario   Decimal          @map("precio_unitario") @db.Decimal(10, 2)
+  estado           EstadoPedido     @default(pendiente)
+  notas            String?
+  codigoProduccion String?
+  codigoImprenta   String?
+  metodoPago       Pago?            @default(al_contado)
 
-  cliente     Cliente     @relation(fields: [clienteId], references: [id])
-  botella     Botella     @relation(fields: [botellaId], references: [id])
+  personalizaciones Personalizacion[]
 
-  @@map("ventas")
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+
+  cliente          Cliente          @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  variante         VarianteProducto @relation(fields: [varianteId], references: [id], onDelete: Cascade)
+
+  @@index([clienteId, estado])
+  @@map("pedidos")
 }
 
-model Historial {
-  id          Int      @id @default(autoincrement())
-  clienteId   Int      @map("cliente_id")
-  botellaId   Int      @map("botella_id")
-  cantidad    Int
-  precioTotal Float    @map("precio_total")
-  notas       String?
-  entregadoAt DateTime @default(now()) @map("entregado_at")
+model Personalizacion {
+  id        Int    @id @default(autoincrement())
+  pedidoId  Int    @map("pedido_id")
+  tipo      String
+  valor     String
 
-  cliente     Cliente  @relation(fields: [clienteId], references: [id])
-  botella     Botella  @relation(fields: [botellaId], references: [id])
+  pedido    Pedido @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
 
-  @@map("historial")
+  @@map("personalizaciones")
+}
+
+model HistorialPedido {
+  id               Int      @id @default(autoincrement())
+  pedidoId         Int      @map("pedido_id")
+  clienteId        Int?     @map("cliente_id")
+
+  pedidoData       Json     @map("pedido_data")
+
+  totalSinFactura  Decimal  @map("total_sin_factura") @db.Decimal(10, 2)
+  totalConFactura  Decimal  @map("total_con_factura") @db.Decimal(10, 2)
+
+  estadoFinal      String   @map("estado_final")
+
+  entregadoAt      DateTime @default(now()) @map("entregado_at")
+
+  @@index([entregadoAt])
+  @@map("historial_pedidos")
+}
+
+model Entrega {
+  id         Int      @id @default(autoincrement())
+  pedidoId   Int      @unique
+  movilId    Int
+  fechaSalida DateTime @default(now())
+  fechaEntrega DateTime?
+
+  pedido     Pedido   @relation(fields: [pedidoId], references: [id], onDelete: Cascade)
+  movil      Movil    @relation(fields: [movilId], references: [id])
+
+  @@map("entregas")
+}
+
+model Movil {
+  id        Int      @id @default(autoincrement())
+  nombre    String   // Ej: "Movil 1", "Camioneta A"
+  placa     String?  // opcional
+  activo    Boolean  @default(true)
+
+  entregas  Entrega[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("moviles")
 }

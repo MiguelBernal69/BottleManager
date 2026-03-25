@@ -1,9 +1,9 @@
 import { Request, Response } from 'express';
-import { EstadoVenta } from '@prisma/client';
+import { EstadoPedido } from '@prisma/client';
 import prisma from '../db/prisma';
 
 const include = { cliente: true, botella: true };
-const ESTADOS_VALIDOS = Object.values(EstadoVenta);
+const ESTADOS_VALIDOS = Object.values(EstadoPedido);
 
 export const getAll = async (_req: Request, res: Response) => {
   const ventas = await prisma.venta.findMany({ include, orderBy: { createdAt: 'desc' } });

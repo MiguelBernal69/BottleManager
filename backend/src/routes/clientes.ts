@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import * as ctrl from '../controllers/clienteController';
+import * as ctrl from '../controllers/clientesController';
 const router = Router();
 router.get('/', ctrl.getAll);
 router.get('/:id', ctrl.getById);

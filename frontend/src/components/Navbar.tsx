@@ -1,11 +1,11 @@
 import { NavLink } from 'react-router-dom'
 
 const links = [
-  { to: '/seguimiento', label: 'Seguimiento' },
-  { to: '/ventas', label: 'Ventas' },
-  { to: '/clientes', label: 'Clientes' },
-  { to: '/botellas', label: 'Botellas' },
   { to: '/dashboard', label: 'Dashboard' },
+  { to: '/clientes', label: 'Clientes' },
+  { to: '/productos', label: 'Productos' },
+  { to: '/pedidos', label: 'Pedidos' },
+  { to: '/seguimiento', label: 'Seguimiento' },
   { to: '/historial', label: 'Historial' },
 ]
 
@@ -14,7 +14,7 @@ export default function Navbar() {
     <nav className="bg-white border-b border-gray-200 shadow-sm">
       <div className="max-w-7xl mx-auto px-4">
         <div className="flex items-center gap-1 h-14">
-          <span className="font-semibold text-gray-800 mr-6 text-lg">💧 BottleManager</span>
+          <span className="font-semibold text-gray-800 mr-6 text-lg">💧 EmpresaAgua</span>
           {links.map(link => (
             <NavLink
               key={link.to}

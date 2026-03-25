@@ -1,35 +1,50 @@
 import { Request, Response } from 'express'
 import prisma from '../db/prisma'
 
-const include = { cliente: true, botella: true }
-
 export const getAll = async (_req: Request, res: Response) => {
-    console.log(prisma);
-  const historial = await prisma.historial.findMany({
-    include,
-    orderBy: { entregadoAt: 'desc' },
-  })
-  res.json(historial)
+  try {
+    const historial = await prisma.historialPedido.findMany({
+      orderBy: { entregadoAt: 'desc' },
+    })
+    res.json(historial)
+  } catch (e) {
+    res.status(500).json({ error: 'Error al obtener historial' })
+  }
 }
 
 export const entregar = async (req: Request, res: Response) => {
-  const id = Number(req.params.id)
-
-  const venta = await prisma.venta.findUnique({ where: { id }, include })
-  if (!venta) return res.status(404).json({ error: 'Venta no encontrada' })
-
-  await prisma.$transaction([
-    prisma.historial.create({
-      data: {
-        clienteId: venta.clienteId,
-        botellaId: venta.botellaId,
-        cantidad: venta.cantidad,
-        precioTotal: venta.precioTotal,
-        notas: venta.notas,
+  try {
+    const id = Number(req.params.id)
+    const pedido = await prisma.pedido.findUnique({
+      where: { id },
+      include: {
+        cliente: true,
+        variante: { include: { producto: true } },
+        personalizaciones: true,
       },
-    }),
-    prisma.venta.delete({ where: { id } }),
-  ])
+    })
+    if (!pedido) return res.status(404).json({ error: 'Pedido no encontrado' })
 
-  res.json({ message: 'Venta entregada y movida al historial' })
+    const totalSinFactura = Number(pedido.variante.precioSinFactura) * pedido.cantidad
+    const totalConFactura = Number(pedido.variante.precioConFactura) * pedido.cantidad
+
+    await prisma.$transaction([
+      prisma.historialPedido.create({
+        data: {
+          pedidoId: pedido.id,
+          clienteId: pedido.clienteId,
+          pedidoData: JSON.parse(JSON.stringify(pedido)),
+          totalSinFactura,
+          totalConFactura,
+          estadoFinal: 'entregado',
+        },
+      }),
+      prisma.pedido.delete({ where: { id } }),
+    ])
+
+    res.json({ message: 'Pedido entregado y guardado en historial' })
+  } catch (e) {
+    console.error(e)
+    res.status(500).json({ error: 'Error al entregar pedido' })
+  }
 }

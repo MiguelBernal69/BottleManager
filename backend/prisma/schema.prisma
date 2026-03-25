@@ -87,11 +87,14 @@ model Pedido {
   precioUnitario   Decimal          @map("precio_unitario") @db.Decimal(10, 2)
   estado           EstadoPedido     @default(pendiente)
   notas            String?
+  totalPagar       Decimal?
   codigoProduccion String?
   codigoImprenta   String?
   metodoPago       Pago?            @default(al_contado)
 
   personalizaciones Personalizacion[]
+
+  entrega          Entrega?   // 🔥 ESTA LÍNEA FALTABA
 
   createdAt        DateTime         @default(now()) @map("created_at")
   updatedAt        DateTime         @updatedAt @map("updated_at")
@@ -118,6 +121,8 @@ model HistorialPedido {
   id               Int      @id @default(autoincrement())
   pedidoId         Int      @map("pedido_id")
   clienteId        Int?     @map("cliente_id")
+
+  movilId          Int?     @map("movil_id") // 🔥 NUEVO
 
   pedidoData       Json     @map("pedido_data")
 

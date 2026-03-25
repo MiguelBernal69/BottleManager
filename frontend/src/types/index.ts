@@ -1,9 +1,14 @@
+export type Departamento = 'cochabamba' | 'la_paz' | 'santa_cruz' | 'oruro' | 'potosi' | 'tarija' | 'beni' | 'pando' | 'sucre'
+
+export type Pago = 'qr' | 'al_contado' | 'credito'
+
 export interface Cliente {
   id: number
-  nombre: string
-  email?: string
+  empresa: string
+  nombreCliente?: string
   telefono?: string
   direccion?: string
+  departamento?: Departamento
   createdAt: string
   updatedAt: string
 }
@@ -45,6 +50,10 @@ export interface Pedido {
   precioUnitario: string
   estado: EstadoPedido
   notas?: string
+  totalPagar: number
+  codigoProduccion: string
+  codigoImprenta: string
+  pago?: Pago
   createdAt: string
   updatedAt: string
   cliente: Cliente

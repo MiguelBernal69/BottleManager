@@ -35,7 +35,7 @@ export const getById = async (req: Request, res: Response) => {
 
 export const create = async (req: Request, res: Response) => {
   try {
-    const { clienteId, varianteId, cantidad, precioUnitario, notas, personalizaciones } = req.body
+    const { clienteId, varianteId, cantidad, precioUnitario, notas, totalPagar, codigoProduccion, codigoImprenta, personalizaciones } = req.body
     if (!clienteId || !varianteId || !cantidad || !precioUnitario)
       return res.status(400).json({ error: 'Faltan campos requeridos' })
 
@@ -46,6 +46,9 @@ export const create = async (req: Request, res: Response) => {
         cantidad: Number(cantidad),
         precioUnitario,
         notas,
+        totalPagar: Number(totalPagar), // Aquí deberías calcular el total real
+        codigoProduccion,
+        codigoImprenta,
         personalizaciones: personalizaciones?.length
           ? { create: personalizaciones.map((p: any) => ({ tipo: p.tipo, valor: p.valor })) }
           : undefined,

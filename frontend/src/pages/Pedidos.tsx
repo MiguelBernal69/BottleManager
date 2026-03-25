@@ -45,6 +45,33 @@ export default function Pedidos() {
   const variantesDelProducto: VarianteProducto[] = productos.find(p => p.id === Number(productoId))?.variantes ?? []
   const varianteSeleccionada = variantesDelProducto.find(v => v.id === Number(varianteId))
 
+  const normalizar = (str: string) =>
+    str
+      .toUpperCase()
+      .replace(/\s+/g, '')
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, '')
+
+  const generarCodigos = () => {
+    if (!clienteId || !varianteSeleccionada) return null
+
+    const cliente = clientes.find(c => c.id === Number(clienteId))
+    if (!cliente) return null
+
+    const empresa = normalizar(cliente.empresa)
+    const departamento = cliente.departamento // ya tipo: la_paz
+
+    const cantidadUnidades = Number(cantidad) || 1
+    const volumen = `${varianteSeleccionada.tamanoMl}ML`
+
+    const codigoProduccion = `T_${empresa}_${cantidadUnidades}U_${volumen}_${departamento}`
+    const codigoImprenta = `AD.1COLOR_${empresa}_${volumen}_${departamento}`
+
+    return { codigoProduccion, codigoImprenta }
+  }
+
+  const codigosPreview = generarCodigos()
+
   // Total en tiempo real
   const totalCalculado = precioUnitario && cantidad
     ? (Number(precioUnitario) * Number(cantidad)).toFixed(2)
@@ -105,6 +132,9 @@ export default function Pedidos() {
         cantidad: Number(cantidad),
         precioUnitario,
         notas,
+        totalPagar: Number(totalCalculado),
+        codigoProduccion: codigosPreview?.codigoProduccion,
+        codigoImprenta: codigosPreview?.codigoImprenta,
         personalizaciones: personalizaciones.filter(p => p.tipo && p.valor),
       })
       setOpen(false)
@@ -134,7 +164,7 @@ export default function Pedidos() {
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-gray-500 border-b bg-gray-50">
-                <th className="px-4 py-3">Cliente</th>
+                <th className="px-4 py-3">Empresa</th>
                 <th className="px-4 py-3">Producto</th>
                 <th className="px-4 py-3">Variante</th>
                 <th className="px-4 py-3">Cantidad</th>
@@ -148,7 +178,7 @@ export default function Pedidos() {
             <tbody>
               {pedidos.map(p => (
                 <tr key={p.id} className="border-b last:border-0 hover:bg-gray-50">
-                  <td className="px-4 py-3 font-medium">{p.cliente.nombre}</td>
+                  <td className="px-4 py-3 font-medium">{p.cliente.empresa}</td>
                   <td className="px-4 py-3">{p.variante.producto.nombre}</td>
                   <td className="px-4 py-3 text-gray-500">
                     {p.variante.tamanoMl}ml · {p.variante.material} · {p.variante.tipo}
@@ -194,12 +224,12 @@ export default function Pedidos() {
 
             {/* Cliente */}
             <div>
-              <Label>Cliente</Label>
+              <Label>Empresa</Label>
               <Select value={clienteId} onValueChange={setClienteId}>
-                <SelectTrigger><SelectValue placeholder="Seleccionar cliente" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Seleccionar empresa" /></SelectTrigger>
                 <SelectContent>
                   {clientes.map(c => (
-                    <SelectItem key={c.id} value={String(c.id)}>{c.nombre}</SelectItem>
+                    <SelectItem key={c.id} value={String(c.id)}>{c.empresa}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -269,7 +299,7 @@ export default function Pedidos() {
             {/* Cantidad y precio */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label>Cantidad (paquetes)</Label>
+                <Label>Cantidad (unidades)</Label>
                 <Input
                   type="number"
                   min={1}
@@ -297,8 +327,16 @@ export default function Pedidos() {
               }`}>
                 Total a pagar: Bs. {totalCalculado}
                 <span className="font-normal text-xs ml-2">
-                  ({cantidad} paquetes × Bs. {precioUnitario})
+                  ({cantidad} unidad × Bs. {precioUnitario})
                 </span>
+              </div>
+            )}
+
+
+            {codigosPreview && (
+              <div className="bg-gray-50 border rounded-md p-3 text-xs space-y-1">
+                <div><strong>Producción:</strong> {codigosPreview.codigoProduccion}</div>
+                <div><strong>Imprenta:</strong> {codigosPreview.codigoImprenta}</div>
               </div>
             )}
 

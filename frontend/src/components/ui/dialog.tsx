@@ -49,10 +49,20 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
+  size = "sm", // 👈 nuevo
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
+  size?: "sm" | "md" | "lg" | "xl" | "full"
 }) {
+
+    const sizes = {
+    sm: "sm:max-w-sm",
+    md: "sm:max-w-md",
+    lg: "sm:max-w-2xl",
+    xl: "sm:max-w-4xl",
+    full: "sm:max-w-[95vw] sm:h-[90vh]"
+  }
   return (
     <DialogPortal>
       <DialogOverlay />
@@ -60,6 +70,7 @@ function DialogContent({
         data-slot="dialog-content"
         className={cn(
           "border-2 border-indigo-600 fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-lg bg-background p-4 text-xs/relaxed ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95",
+          sizes[size], // 👈 aquí cambia dinámicamente
           className
         )}
         {...props}
@@ -69,7 +80,7 @@ function DialogContent({
           <DialogPrimitive.Close data-slot="dialog-close" asChild>
             <Button
               variant="ghost"
-              className="absolute top-2 right-2"
+              className="bg-red-600 rounded absolute top-2 right-2 border-background hover:bg-transparent focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-transparent"
               size="icon-sm"
             >
               <XIcon

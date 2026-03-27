@@ -1,70 +1,94 @@
 import { useEffect, useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import api from '../api/axios'
 import type { Cliente } from '../types'
 
-const empty = { empresa: '', nombreCliente: '', telefono: '', direccion: '', departamento: '' }
+const DEPARTAMENTOS = [
+  { value: 'cochabamba', label: 'Cochabamba' },
+  { value: 'santa_cruz', label: 'Santa Cruz' },
+  { value: 'la_paz', label: 'La Paz' },
+  { value: 'oruro', label: 'Oruro' },
+  { value: 'potosi', label: 'Potosí' },
+  { value: 'sucre', label: 'Sucre' },
+  { value: 'tarija', label: 'Tarija' },
+  { value: 'beni', label: 'Beni' },
+  { value: 'pando', label: 'Pando' },
+]
 
-const DEPARTAMENTO_LABELS: Record<string, string> = {
-  cochabamba: 'Cochabamba',
-  santa_cruz: 'Santa Cruz',
-  la_paz: 'La Paz',
-  oruro: 'Oruro',
-  potosi: 'Potosí',
-  beni: 'Beni',
-  tarija: 'Tarija',
-  sucre: 'Sucre',
-  pando: 'Pando'
-}
+const empty = { empresa: '', nombreCliente: '', telefono: '', direccion: '', departamento: 'cochabamba' }
 
 export default function Clientes() {
   const [clientes, setClientes] = useState<Cliente[]>([])
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<Cliente | null>(null)
-  const [form, setForm] = useState<typeof empty>(empty)
+  const [form, setForm] = useState(empty)
   const [search, setSearch] = useState('')
 
   const load = () => api.get('/clientes').then(r => setClientes(r.data))
   useEffect(() => { load() }, [])
 
   const openCreate = () => { setEditing(null); setForm(empty); setOpen(true) }
-  const openEdit = (c: Cliente) => { setEditing(c); setForm({ empresa: c.empresa, nombreCliente: c.nombreCliente ?? '', telefono: c.telefono ?? '', direccion: c.direccion ?? '', departamento: c.departamento ?? '' }); setOpen(true) }
+  const openEdit = (c: Cliente) => {
+    setEditing(c)
+    setForm({
+      empresa: c.empresa,
+      nombreCliente: c.nombreCliente ?? '',
+      telefono: c.telefono ?? '',
+      direccion: c.direccion ?? '',
+      departamento: c.departamento ?? 'cochabamba',
+    })
+    setOpen(true)
+  }
 
   const handleSubmit = async () => {
-    if (editing) await api.put(`/clientes/${editing.id}`, form)
-    else await api.post('/clientes', form)
-    setOpen(false); load()
+    if (!form.empresa.trim()) { alert('La empresa es requerida'); return }
+    try {
+      if (editing) await api.put(`/clientes/${editing.id}`, form)
+      else await api.post('/clientes', form)
+      setOpen(false); load()
+    } catch (e: any) {
+      alert(e?.response?.data?.error ?? 'Error al guardar')
+    }
   }
 
   const handleDelete = async (id: number) => {
     if (confirm('¿Eliminar este cliente?')) { await api.delete(`/clientes/${id}`); load() }
   }
 
-  const filtered = clientes.filter(c => c.empresa.toLowerCase().includes(search.toLowerCase()))
+  const filtered = clientes.filter(c =>
+    c.empresa.toLowerCase().includes(search.toLowerCase()) ||
+    (c.nombreCliente ?? '').toLowerCase().includes(search.toLowerCase())
+  )
+
+  const deptLabel = (v?: string) => DEPARTAMENTOS.find(d => d.value === v)?.label ?? v ?? '—'
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-gray-800">Clientes</h1>
-        <Button onClick={openCreate}>+ Nuevo cliente</Button>
+        <Button 
+        className='bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md'
+        onClick={openCreate}>+ Nuevo cliente</Button>
       </div>
 
-      <Input placeholder="Buscar por nombre..." value={search} onChange={e => setSearch(e.target.value)} className="max-w-xs rounded-md" />
+      <Input  placeholder="Buscar empresa o contacto..." value={search}
+        onChange={e => setSearch(e.target.value)} className="max-w-xs rounded-md" />
 
-      <Card>
+      <Card className='rounded-lg border'>
         <CardContent className="p-0">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-gray-500 border-b bg-gray-50">
                 <th className="px-4 py-3">Empresa</th>
-                <th className="px-4 py-3">Nombre del cliente</th>
+                <th className="px-4 py-3">Contacto</th>
                 <th className="px-4 py-3">Teléfono</th>
-                <th className="px-4 py-3">Dirección</th>
                 <th className="px-4 py-3">Departamento</th>
+                <th className="px-4 py-3">Dirección</th>
                 <th className="px-4 py-3">Acciones</th>
               </tr>
             </thead>
@@ -74,15 +98,15 @@ export default function Clientes() {
                   <td className="px-4 py-3 font-medium">{c.empresa}</td>
                   <td className="px-4 py-3 text-gray-500">{c.nombreCliente ?? '—'}</td>
                   <td className="px-4 py-3 text-gray-500">{c.telefono ?? '—'}</td>
+                  <td className="px-4 py-3 text-gray-500">{deptLabel(c.departamento)}</td>
                   <td className="px-4 py-3 text-gray-500">{c.direccion ?? '—'}</td>
-                  <td className="px-4 py-3 text-gray-500">{DEPARTAMENTO_LABELS[c.departamento as keyof typeof DEPARTAMENTO_LABELS]}</td>
                   <td className="px-4 py-3 flex gap-2">
-                    <Button size="sm"
-                      className='bg-blue-500 hover:bg-blue-600 text-white rounded-md'
-                      variant="outline" onClick={() => openEdit(c)}>Editar</Button>
-                    <Button size="sm"
-                      className='bg-red-500 hover:bg-red-600 text-white rounded-md'
-                       variant="destructive" onClick={() => handleDelete(c.id)}>Eliminar</Button>
+                    <Button 
+                    className='bg-slate-100 hover:bg-slate-300 font-bold py-2 px-4 rounded-md'
+                    size="sm" variant="outline" onClick={() => openEdit(c)}>Editar</Button>
+                    <Button 
+                    className='bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-md'
+                    size="sm" variant="destructive" onClick={() => handleDelete(c.id)}>Eliminar</Button>
                   </td>
                 </tr>
               ))}
@@ -90,41 +114,50 @@ export default function Clientes() {
                 <tr><td colSpan={6} className="px-4 py-6 text-center text-gray-400">No hay clientes</td></tr>
               )}
             </tbody>
-          </table>  
+          </table>
         </CardContent>
       </Card>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-lg bg-white">
+        <DialogContent className="bg-white">
           <DialogHeader>
-            <DialogTitle className='text-base'>{editing ? 'Editar cliente' : 'Nuevo cliente'}</DialogTitle>
+            <DialogTitle>{editing ? 'Editar cliente' : 'Nuevo cliente'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3 mt-2">
-            {(['empresa', 'nombreCliente', 'telefono', 'direccion'] as const).map(field => (
-              <div key={field}>
-                <Label className="capitalize text-gray-900 text-sm">{field}</Label>
-                <Input className='rounded-md border-gray-400 hover:border-gray-500 focus:ring-2 focus:ring-blue-500' 
-                  value={form[field]} onChange={e => setForm({ ...form, [field]: e.target.value })} />
-              </div>
-            ))}
-            {/* Campo Departamento como select */}
-              <div>
-                <Label className="capitalize text-gray-900 text-sm">Departamento</Label>
-                <select
-                  value={form.departamento}
-                  onChange={e => setForm({ ...form, departamento: e.target.value })}
-                  className='w-full rounded-md border-gray-400 hover:border-gray-500 focus:ring-2 focus:ring-blue-500 p-2'
-                >
-                  <option value="">Selecciona un departamento</option>
-                  {Object.entries(DEPARTAMENTO_LABELS).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
+            <div>
+              <Label>Empresa</Label>
+              <Input value={form.empresa} placeholder="Nombre de la empresa"
+                onChange={e => setForm({ ...form, empresa: e.target.value })} />
+            </div>
+            <div>
+              <Label>Nombre de contacto (opcional)</Label>
+              <Input value={form.nombreCliente} placeholder="Nombre del contacto"
+                onChange={e => setForm({ ...form, nombreCliente: e.target.value })} />
+            </div>
+            <div>
+              <Label>Teléfono</Label>
+              <Input value={form.telefono} placeholder="Teléfono"
+                onChange={e => setForm({ ...form, telefono: e.target.value })} />
+            </div>
+            <div>
+              <Label>Departamento</Label>
+              <Select value={form.departamento} onValueChange={v => setForm({ ...form, departamento: v })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {DEPARTAMENTOS.map(d => (
+                    <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
                   ))}
-                </select>
-              </div>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>Dirección (opcional)</Label>
+              <Input value={form.direccion} placeholder="Dirección"
+                onChange={e => setForm({ ...form, direccion: e.target.value })} />
+            </div>
+            <Button
 
-            <Button className="w-full mt-2" onClick={handleSubmit}>
+              className="w-full mt-2 border-bg-black hover:bg-slate-300 font-bold py-2 px-4 rounded-md" onClick={handleSubmit}>
               {editing ? 'Guardar cambios' : 'Crear cliente'}
             </Button>
           </div>

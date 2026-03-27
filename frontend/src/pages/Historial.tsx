@@ -6,6 +6,18 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import api from '../api/axios'
 import type { HistorialItem } from '../types'
 
+const METODO_PAGO_LABELS: Record<string, string> = {
+  qr: 'QR',
+  al_contado: 'Al contado',
+  credito: 'Crédito',
+}
+
+const DEPT_LABELS: Record<string, string> = {
+  cochabamba: 'Cochabamba', santa_cruz: 'Santa Cruz', la_paz: 'La Paz',
+  oruro: 'Oruro', potosi: 'Potosí', tarija: 'Tarija',
+  beni: 'Beni', pando: 'Pando', sucre: 'Sucre',
+}
+
 export default function Historial() {
   const [historial, setHistorial] = useState<HistorialItem[]>([])
   const [search, setSearch] = useState('')
@@ -15,19 +27,22 @@ export default function Historial() {
 
   useEffect(() => {
     api.get('/historial').then(r => setHistorial(r.data))
+
   }, [])
 
   const filtered = historial.filter(h => {
-    const nombreCliente = (h.pedidoData?.cliente?.nombre ?? '').toLowerCase()
-    const matchSearch = nombreCliente.includes(search.toLowerCase())
+    const empresa = (h.pedidoData?.cliente?.empresa ?? '').toLowerCase()
+    const nombreCliente = (h.pedidoData?.cliente?.nombreCliente ?? '').toLowerCase()
+    const matchSearch = empresa.includes(search.toLowerCase()) || nombreCliente.includes(search.toLowerCase())
     const fecha = new Date(h.entregadoAt)
     const matchDesde = fechaDesde ? fecha >= new Date(fechaDesde) : true
     const matchHasta = fechaHasta ? fecha <= new Date(fechaHasta + 'T23:59:59') : true
     return matchSearch && matchDesde && matchHasta
   })
 
-  const totalSinFactura = filtered.reduce((acc, h) => acc + Number(h.totalSinFactura), 0)
-  const totalConFactura = filtered.reduce((acc, h) => acc + Number(h.totalConFactura), 0)
+  const totalFiltrado = filtered.reduce((acc, h) => acc + Number(h.totalPagar ?? h.totalSinFactura), 0)
+
+  const d = detalle?.pedidoData
 
   return (
     <div className="space-y-4">
@@ -39,62 +54,58 @@ export default function Historial() {
       {/* Filtros */}
       <div className="flex flex-wrap gap-3 items-end">
         <div>
-          <p className="text-xs text-gray-500 mb-1">Buscar cliente</p>
+          <p className="text-xs text-gray-500 mb-1">Buscar empresa o contacto</p>
           <Input
-            placeholder="Nombre del cliente..."
+            placeholder="Buscar..."
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-48"
+            className="w-52"
           />
         </div>
         <div>
           <p className="text-xs text-gray-500 mb-1">Desde</p>
-          <Input
-            type="date"
-            value={fechaDesde}
-            onChange={e => setFechaDesde(e.target.value)}
-            className="w-40"
-          />
+          <Input type="date" value={fechaDesde}
+            onChange={e => setFechaDesde(e.target.value)} className="w-40" />
         </div>
         <div>
           <p className="text-xs text-gray-500 mb-1">Hasta</p>
-          <Input
-            type="date"
-            value={fechaHasta}
-            onChange={e => setFechaHasta(e.target.value)}
-            className="w-40"
-          />
+          <Input type="date" value={fechaHasta}
+            onChange={e => setFechaHasta(e.target.value)} className="w-40" />
         </div>
         {(search || fechaDesde || fechaHasta) && (
-          <Button variant="outline" size="sm" onClick={() => { setSearch(''); setFechaDesde(''); setFechaHasta('') }}>
-            Limpiar filtros
+          <Button variant="outline" size="sm"
+            onClick={() => { setSearch(''); setFechaDesde(''); setFechaHasta('') }}>
+            Limpiar
           </Button>
         )}
       </div>
 
-      {/* Totales filtrados */}
+      {/* Total filtrado */}
       {filtered.length > 0 && (
         <div className="flex gap-4">
           <div className="bg-green-50 rounded-lg px-4 py-2 text-sm">
-            <span className="text-gray-500">Total sin factura: </span>
-            <span className="font-semibold text-green-700">Bs. {totalSinFactura.toFixed(2)}</span>
+            <span className="text-gray-500">Total entregas: </span>
+            <span className="font-semibold text-green-700">Bs. {totalFiltrado.toFixed(2)}</span>
           </div>
           <div className="bg-blue-50 rounded-lg px-4 py-2 text-sm">
-            <span className="text-gray-500">Total con factura: </span>
-            <span className="font-semibold text-blue-700">Bs. {totalConFactura.toFixed(2)}</span>
+            <span className="text-gray-500">Cantidad de pedidos: </span>
+            <span className="font-semibold text-blue-700">{filtered.length}</span>
           </div>
         </div>
       )}
 
-      <Card>
+      <Card className="rounded-lg border">
         <CardContent className="p-0">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-gray-500 border-b bg-gray-50">
                 <th className="px-4 py-3">Fecha entrega</th>
-                <th className="px-4 py-3">Cliente</th>
-                <th className="px-4 py-3">Sin factura</th>
-                <th className="px-4 py-3">Con factura</th>
+                <th className="px-4 py-3">Empresa</th>
+                <th className="px-4 py-3">Producto</th>
+                <th className="px-4 py-3">Variante</th>
+                <th className="px-4 py-3">Cantidad</th>
+                <th className="px-4 py-3">Total</th>
+                <th className="px-4 py-3">Método pago</th>
                 <th className="px-4 py-3">Detalle</th>
               </tr>
             </thead>
@@ -104,12 +115,25 @@ export default function Historial() {
                   <td className="px-4 py-3 text-gray-500">
                     {new Date(h.entregadoAt).toLocaleDateString('es-BO')}
                   </td>
-                 <td className="px-4 py-3 font-medium">{h.pedidoData?.cliente?.nombre ?? '—'}</td>
-                  <td className="px-4 py-3 text-green-700 font-medium">
-                    Bs. {Number(h.totalSinFactura).toFixed(2)}
+                  <td className="px-4 py-3 font-medium">
+                    {h.pedidoData?.cliente?.empresa ?? '—'}
                   </td>
-                  <td className="px-4 py-3 text-blue-700 font-medium">
-                    Bs. {Number(h.totalConFactura).toFixed(2)}
+                  <td className="px-4 py-3">
+                    {h.pedidoData?.variante?.producto?.nombre ?? '—'}
+                  </td>
+                  <td className="px-4 py-3 text-gray-500">
+                    {h.pedidoData?.variante
+                      ? `${h.pedidoData.variante.tamanoMl}ml · ${h.pedidoData.variante.material} · ${h.pedidoData.variante.tipo}`
+                      : '—'}
+                  </td>
+                  <td className="px-4 py-3">{h.pedidoData?.cantidad ?? '—'}</td>
+                  <td className="px-4 py-3 font-semibold text-green-700">
+                    Bs. {Number(h.totalPagar ?? h.totalSinFactura).toFixed(2)}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+                      {METODO_PAGO_LABELS[h.pedidoData?.metodoPago ?? ''] ?? '—'}
+                    </span>
                   </td>
                   <td className="px-4 py-3">
                     <Button size="sm" variant="outline" onClick={() => setDetalle(h)}>
@@ -120,7 +144,7 @@ export default function Historial() {
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-6 text-center text-gray-400">
+                  <td colSpan={8} className="px-4 py-6 text-center text-gray-400">
                     No hay entregas con los filtros aplicados
                   </td>
                 </tr>
@@ -130,58 +154,100 @@ export default function Historial() {
         </CardContent>
       </Card>
 
-      {/* Modal detalle */}
+      {/* Modal detalle completo */}
       <Dialog open={!!detalle} onOpenChange={() => setDetalle(null)}>
-        <DialogContent className="bg-white max-w-lg">
+        <DialogContent className="bg-white max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Detalle de entrega</DialogTitle>
+            <DialogTitle>Detalle de entrega #{detalle?.id}</DialogTitle>
           </DialogHeader>
-          {detalle && (
+          {detalle && d && (
             <div className="space-y-4 mt-2 text-sm">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-gray-50 rounded-lg p-3">
-                  <p className="text-gray-500 text-xs mb-1">Cliente</p>
-                  <p className="font-medium">{detalle.pedidoData?.cliente?.nombre ?? '—'}</p>
-                </div>
-                <div className="bg-gray-50 rounded-lg p-3">
-                  <p className="text-gray-500 text-xs mb-1">Fecha entrega</p>
-                  <p className="font-medium">{new Date(detalle.entregadoAt).toLocaleDateString('es-BO')}</p>
+
+              {/* Cliente */}
+              <div>
+                <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">Cliente</p>
+                <div className="bg-gray-50 rounded-lg p-3 space-y-1">
+                  <p><span className="text-gray-500">Empresa:</span> <span className="font-medium">{d.cliente?.empresa ?? '—'}</span></p>
+                  {d.cliente?.nombreCliente && <p><span className="text-gray-500">Contacto:</span> {d.cliente.nombreCliente}</p>}
+                  {d.cliente?.telefono && <p><span className="text-gray-500">Teléfono:</span> {d.cliente.telefono}</p>}
+                  {d.cliente?.departamento && <p><span className="text-gray-500">Departamento:</span> {DEPT_LABELS[d.cliente.departamento] ?? d.cliente.departamento}</p>}
+                  {d.cliente?.direccion && <p><span className="text-gray-500">Dirección:</span> {d.cliente.direccion}</p>}
                 </div>
               </div>
 
-              <div className="bg-gray-50 rounded-lg p-3 space-y-2">
-                <p className="text-gray-500 text-xs mb-2">Pedido</p>
-                {detalle.pedidoData?.variante && (
-                  <>
-                    <p><span className="text-gray-500">Producto:</span> <span className="font-medium">{detalle.pedidoData.variante?.producto?.nombre}</span></p>
-                    <p><span className="text-gray-500">Variante:</span> <span className="font-medium">{detalle.pedidoData.variante?.tamanoMl}ml · {detalle.pedidoData.variante?.material} · {detalle.pedidoData.variante?.tipo}</span></p>
-                    <p><span className="text-gray-500">Cantidad:</span> <span className="font-medium">{detalle.pedidoData.cantidad}</span></p>
-                    <p><span className="text-gray-500">Precio unitario:</span> <span className="font-medium">Bs. {Number(detalle.pedidoData.precioUnitario).toFixed(2)}</span></p>
-                  </>
-                )}
-                {detalle.pedidoData?.personalizaciones?.length > 0 && (
-                  <div>
-                    <p className="text-gray-500 mt-2 mb-1">Personalizaciones:</p>
-                    {detalle.pedidoData.personalizaciones.map((p: any, i: number) => (
-                      <p key={i} className="pl-2 text-gray-600">• {p.tipo}: {p.valor}</p>
+              {/* Producto */}
+              <div>
+                <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">Producto</p>
+                <div className="bg-gray-50 rounded-lg p-3 space-y-1">
+                  <p><span className="text-gray-500">Producto:</span> <span className="font-medium">{d.variante?.producto?.nombre ?? '—'}</span></p>
+                  <p><span className="text-gray-500">Tamaño:</span> {d.variante?.tamanoMl}ml</p>
+                  <p><span className="text-gray-500">Material:</span> {d.variante?.material}</p>
+                  <p><span className="text-gray-500">Tipo:</span> {d.variante?.tipo}</p>
+                  <p><span className="text-gray-500">Cant. por paquete:</span> {d.variante?.cantidadPaquete}</p>
+                </div>
+              </div>
+
+              {/* Pedido */}
+              <div>
+                <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">Pedido</p>
+                <div className="bg-gray-50 rounded-lg p-3 space-y-1">
+                  <p><span className="text-gray-500">Cantidad:</span> <span className="font-medium">{d.cantidad} paquetes</span></p>
+                  <p>
+                    <span className="text-gray-500">Total unidades:</span>{' '}
+                    <span className="font-medium">{d.cantidad * (d.variante?.cantidadPaquete ?? 1)}</span>
+                  </p>
+                  <p><span className="text-gray-500">Precio unitario:</span> Bs. {Number(d.precioUnitario).toFixed(2)}</p>
+                  <p>
+                    <span className="text-gray-500">Total pagado:</span>{' '}
+                    <span className="font-semibold text-green-700">
+                      Bs. {Number(detalle.totalPagar ?? detalle.totalSinFactura).toFixed(2)}
+                    </span>
+                  </p>
+                  <p>
+                    <span className="text-gray-500">Método de pago:</span>{' '}
+                    <span className="font-medium">{METODO_PAGO_LABELS[d.metodoPago ?? ''] ?? '—'}</span>
+                  </p>
+                  {d.notas && <p><span className="text-gray-500">Notas:</span> {d.notas}</p>}
+                </div>
+              </div>
+
+              {/* Códigos */}
+              {(d.codigoProduccion || d.codigoImprenta) && (
+                <div>
+                  <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">Códigos</p>
+                  <div className="bg-gray-50 rounded-lg p-3 space-y-1">
+                    {d.codigoProduccion && (
+                      <p><span className="text-gray-500">Producción:</span> <span className="font-mono text-xs">{d.codigoProduccion}</span></p>
+                    )}
+                    {d.codigoImprenta && (
+                      <p><span className="text-gray-500">Imprenta:</span> <span className="font-mono text-xs">{d.codigoImprenta}</span></p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Personalizaciones */}
+              {d.personalizaciones?.length > 0 && (
+                <div>
+                  <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">Personalizaciones</p>
+                  <div className="bg-gray-50 rounded-lg p-3 space-y-1">
+                    {d.personalizaciones.map((p: any, i: number) => (
+                      <p key={i}>• <span className="text-gray-500">{p.tipo}:</span> {p.valor}</p>
                     ))}
                   </div>
-                )}
-                {detalle.pedidoData?.notas && (
-                  <p><span className="text-gray-500">Notas:</span> <span className="font-medium">{detalle.pedidoData.notas}</span></p>
-                )}
+                </div>
+              )}
+
+              {/* Entrega */}
+              <div>
+                <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">Entrega</p>
+                <div className="bg-gray-50 rounded-lg p-3 space-y-1">
+                  <p><span className="text-gray-500">Estado final:</span> <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">{detalle.estadoFinal}</span></p>
+                  <p><span className="text-gray-500">Fecha pedido:</span> {new Date(d.createdAt).toLocaleDateString('es-BO')}</p>
+                  <p><span className="text-gray-500">Fecha entrega:</span> <span className="font-medium">{new Date(detalle.entregadoAt).toLocaleDateString('es-BO')}</span></p>
+                </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-green-50 rounded-lg p-3">
-                  <p className="text-gray-500 text-xs mb-1">Total sin factura</p>
-                  <p className="font-semibold text-green-700 text-lg">Bs. {Number(detalle.totalSinFactura).toFixed(2)}</p>
-                </div>
-                <div className="bg-blue-50 rounded-lg p-3">
-                  <p className="text-gray-500 text-xs mb-1">Total con factura</p>
-                  <p className="font-semibold text-blue-700 text-lg">Bs. {Number(detalle.totalConFactura).toFixed(2)}</p>
-                </div>
-              </div>
             </div>
           )}
         </DialogContent>

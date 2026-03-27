@@ -7,6 +7,7 @@ import variantesRouter from './routes/variantes'
 import pedidosRouter from './routes/pedidos'
 import historialRouter from './routes/historial'
 import dashboardRouter from './routes/dashboard'
+import movilesRouter from './routes/moviles'
 
 dotenv.config()
 
@@ -33,6 +34,7 @@ app.use('/api/variantes', variantesRouter)
 app.use('/api/pedidos', pedidosRouter)
 app.use('/api/historial', historialRouter)
 app.use('/api/dashboard', dashboardRouter)
+app.use('/api/moviles', movilesRouter)
 
 app.get('/api/health', (_, res) => {
   res.json({ status: 'ok', message: 'API corriendo 🚀' })

@@ -21,6 +21,7 @@ export const entregar = async (req: Request, res: Response) => {
         cliente: true,
         variante: { include: { producto: true } },
         personalizaciones: true,
+        entrega: { include: { movil: true } },
       },
     })
     if (!pedido) return res.status(404).json({ error: 'Pedido no encontrado' })

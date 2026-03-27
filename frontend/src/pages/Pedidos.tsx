@@ -18,13 +18,29 @@ const ESTADO_COLORS: Record<string, string> = {
   en_produccion: 'bg-yellow-100 text-yellow-700',
   en_envio: 'bg-blue-100 text-blue-700',
 }
+const COLORES_TAPA = [
+  { label: 'Negro', value: 'N' },
+  { label: 'Blanco', value: 'B' },
+  { label: 'Transparente', value: 'T' },
+]
+const COLORES_ADHESIVO = [
+  { label: 'Blanco', value: 'B' },
+  { label: 'Transparente', value: 'T' },
+]
+const METODOS_PAGO = [
+  { label: 'Al contado', value: 'al_contado' },
+  { label: 'QR', value: 'qr' },
+  { label: 'Crédito', value: 'credito' },
+]
 
 export default function Pedidos() {
   const [pedidos, setPedidos] = useState<Pedido[]>([])
   const [clientes, setClientes] = useState<Cliente[]>([])
   const [productos, setProductos] = useState<Producto[]>([])
   const [open, setOpen] = useState(false)
+  const [editing, setEditing] = useState<Pedido | null>(null)
 
+  // Form states
   const [clienteId, setClienteId] = useState('')
   const [productoId, setProductoId] = useState('')
   const [varianteId, setVarianteId] = useState('')
@@ -32,10 +48,12 @@ export default function Pedidos() {
   const [precioUnitario, setPrecioUnitario] = useState('')
   const [tipoFactura, setTipoFactura] = useState<'sinFactura' | 'conFactura'>('sinFactura')
   const [notas, setNotas] = useState('')
+  const [metodoPago, setMetodoPago] = useState('al_contado')
+  const [colorTapa, setColorTapa] = useState('')
+  const [colorAdhesivo, setColorAdhesivo] = useState('')
   const [personalizaciones, setPersonalizaciones] = useState<{ tipo: string; valor: string }[]>([])
 
   const load = () => api.get('/pedidos').then(r => setPedidos(r.data))
-
   useEffect(() => {
     load()
     api.get('/clientes').then(r => setClientes(r.data))
@@ -45,50 +63,45 @@ export default function Pedidos() {
   const variantesDelProducto: VarianteProducto[] = productos.find(p => p.id === Number(productoId))?.variantes ?? []
   const varianteSeleccionada = variantesDelProducto.find(v => v.id === Number(varianteId))
 
-  const normalizar = (str: string) =>
-    str
-      .toUpperCase()
-      .replace(/\s+/g, '')
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, '')
-
-  const generarCodigos = () => {
-    if (!clienteId || !varianteSeleccionada) return null
-
-    const cliente = clientes.find(c => c.id === Number(clienteId))
-    if (!cliente) return null
-
-    const empresa = normalizar(cliente.empresa)
-    const departamento = cliente.departamento // ya tipo: la_paz
-
-    const cantidadUnidades = Number(cantidad) || 1
-    const volumen = `${varianteSeleccionada.tamanoMl}ML`
-
-    const codigoProduccion = `T_${empresa}_${cantidadUnidades}U_${volumen}_${departamento}`
-    const codigoImprenta = `AD.1COLOR_${empresa}_${volumen}_${departamento}`
-
-    return { codigoProduccion, codigoImprenta }
-  }
-
-  const codigosPreview = generarCodigos()
-
-  // Total en tiempo real
   const totalCalculado = precioUnitario && cantidad
     ? (Number(precioUnitario) * Number(cantidad)).toFixed(2)
     : null
 
-  const aplicarPrecio = (
-    variante: VarianteProducto | undefined,
-    tipo: 'sinFactura' | 'conFactura'
-  ) => {
+  const normalizar = (str: string) =>
+    str.toUpperCase().replace(/\s+/g, '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+
+const generarCodigos = () => {
+  if (!clienteId || !colorTapa || !colorAdhesivo) return null
+
+  // Buscar variante desde todos los productos si variantesDelProducto está vacío
+  const variante = varianteSeleccionada ??
+    productos.flatMap(p => p.variantes).find(v => v.id === Number(varianteId))
+
+  if (!variante) return null
+
+  const cliente = clientes.find(c => c.id === Number(clienteId))
+  if (!cliente) return null
+
+  const empresa = normalizar(cliente.empresa)
+  const departamento = cliente.departamento
+  const cantidadUnidades = Number(cantidad) || 1
+  const volumen = `${variante.tamanoMl}ML`
+
+  return {
+    codigoProduccion: `T.${colorTapa}_${empresa}_${cantidadUnidades}U_${volumen}_${departamento}`,
+    codigoImprenta: `AD.${colorAdhesivo}_${empresa}_${volumen}_${departamento}`,
+  }
+}
+
+  const codigosPreview = generarCodigos()
+
+  const aplicarPrecio = (variante: VarianteProducto | undefined, tipo: 'sinFactura' | 'conFactura') => {
     if (!variante) return
     setPrecioUnitario(tipo === 'sinFactura' ? variante.precioSinFactura : variante.precioConFactura)
   }
 
   const handleSelectProducto = (pid: string) => {
-    setProductoId(pid)
-    setVarianteId('')
-    setPrecioUnitario('')
+    setProductoId(pid); setVarianteId(''); setPrecioUnitario('')
   }
 
   const handleSelectVariante = (vid: string) => {
@@ -102,12 +115,8 @@ export default function Pedidos() {
     aplicarPrecio(varianteSeleccionada, tipo)
   }
 
-  const addPersonalizacion = () =>
-    setPersonalizaciones([...personalizaciones, { tipo: '', valor: '' }])
-
-  const removePersonalizacion = (i: number) =>
-    setPersonalizaciones(personalizaciones.filter((_, idx) => idx !== i))
-
+  const addPersonalizacion = () => setPersonalizaciones([...personalizaciones, { tipo: '', valor: '' }])
+  const removePersonalizacion = (i: number) => setPersonalizaciones(personalizaciones.filter((_, idx) => idx !== i))
   const updatePersonalizacion = (i: number, field: 'tipo' | 'valor', value: string) => {
     const updated = [...personalizaciones]
     updated[i][field] = value
@@ -115,10 +124,44 @@ export default function Pedidos() {
   }
 
   const resetForm = () => {
+    setEditing(null)
     setClienteId(''); setProductoId(''); setVarianteId('')
     setCantidad('1'); setPrecioUnitario(''); setNotas('')
+    setMetodoPago('al_contado'); setColorTapa(''); setColorAdhesivo('')
     setPersonalizaciones([]); setTipoFactura('sinFactura')
   }
+
+  const openCreate = () => { resetForm(); setOpen(true) }
+
+const openEdit = (p: Pedido) => {
+  setEditing(p)
+
+  const productoEncontrado = productos.find(pr => pr.variantes.some(v => v.id === p.varianteId))
+  setProductoId(productoEncontrado ? String(productoEncontrado.id) : '')
+  setClienteId(String(p.clienteId))
+  setVarianteId(String(p.varianteId))
+  setCantidad(String(p.cantidad))
+  setPrecioUnitario(p.precioUnitario)
+  setNotas(p.notas ?? '')
+  setMetodoPago(p.metodoPago ?? 'al_contado')
+  setPersonalizaciones(p.personalizaciones.map(per => ({ tipo: per.tipo, valor: per.valor })))
+
+  // Extraer colores de los códigos
+  let tapa = ''
+  let adhesivo = ''
+  if (p.codigoProduccion) {
+    const match = p.codigoProduccion.match(/^T\.([A-Z])_/)
+    if (match) tapa = match[1]
+  }
+  if (p.codigoImprenta) {
+    const match = p.codigoImprenta.match(/^AD\.([A-Z])_/)
+    if (match) adhesivo = match[1]
+  }
+  setColorTapa(tapa)
+  setColorAdhesivo(adhesivo)
+
+  setOpen(true)
+}
 
   const handleSubmit = async () => {
     if (!clienteId || !varianteId || !cantidad || !precioUnitario) {
@@ -126,22 +169,30 @@ export default function Pedidos() {
       return
     }
     try {
-      await api.post('/pedidos', {
+      const payload = {
         clienteId: Number(clienteId),
         varianteId: Number(varianteId),
         cantidad: Number(cantidad),
         precioUnitario,
         notas,
+        metodoPago,
         totalPagar: Number(totalCalculado),
-        codigoProduccion: codigosPreview?.codigoProduccion,
-        codigoImprenta: codigosPreview?.codigoImprenta,
+        codigoProduccion: codigosPreview?.codigoProduccion ?? '',
+        codigoImprenta: codigosPreview?.codigoImprenta ?? '',
         personalizaciones: personalizaciones.filter(p => p.tipo && p.valor),
-      })
+      }
+
+      if (editing) {
+        await api.put(`/pedidos/${editing.id}`, payload)
+      } else {
+        await api.post('/pedidos', payload)
+      }
+
       setOpen(false)
       resetForm()
       load()
     } catch (e: any) {
-      alert(e?.response?.data?.error ?? 'Error al crear pedido')
+      alert(e?.response?.data?.error ?? 'Error al guardar pedido')
     }
   }
 
@@ -156,10 +207,12 @@ export default function Pedidos() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-gray-800">Pedidos</h1>
-        <Button onClick={() => { resetForm(); setOpen(true) }}>+ Nuevo pedido</Button>
+        <Button className="bg-blue-500 hover:bg-blue-700 text-white rounded-md" onClick={openCreate}>
+          + Nuevo pedido
+        </Button>
       </div>
 
-      <Card>
+      <Card className='rounded-lg border'>
         <CardContent className="p-0">
           <table className="w-full text-sm">
             <thead>
@@ -184,9 +237,7 @@ export default function Pedidos() {
                     {p.variante.tamanoMl}ml · {p.variante.material} · {p.variante.tipo}
                   </td>
                   <td className="px-4 py-3">{p.cantidad}</td>
-                  <td className="px-4 py-3 font-medium">
-                    Bs. {Number(p.precioUnitario).toFixed(2)}
-                  </td>
+                  <td className="px-4 py-3 font-medium">Bs. {Number(p.precioUnitario).toFixed(2)}</td>
                   <td className="px-4 py-3 font-semibold text-green-700">
                     Bs. {(Number(p.precioUnitario) * p.cantidad).toFixed(2)}
                   </td>
@@ -198,10 +249,13 @@ export default function Pedidos() {
                   <td className="px-4 py-3 text-gray-500">
                     {new Date(p.createdAt).toLocaleDateString('es-BO')}
                   </td>
-                  <td className="px-4 py-3">
-                    <Button size="sm" variant="destructive" onClick={() => handleDelete(p.id)}>
-                      Eliminar
-                    </Button>
+                  <td className="px-4 py-3 flex gap-2">
+                    <Button 
+                      className='bg-slate-100 hover:bg-slate-300 font-bold py-2 px-4 rounded-md'
+                      size="sm" variant="outline" onClick={() => openEdit(p)}>Editar</Button>
+                    <Button 
+                      className='bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-md'
+                      size="sm" variant="destructive" onClick={() => handleDelete(p.id)}>Eliminar</Button>
                   </td>
                 </tr>
               ))}
@@ -217,38 +271,33 @@ export default function Pedidos() {
         </CardContent>
       </Card>
 
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={v => { if (!v) resetForm(); setOpen(v) }}>
         <DialogContent className="bg-white max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>Nuevo pedido</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>{editing ? 'Editar pedido' : 'Nuevo pedido'}</DialogTitle>
+          </DialogHeader>
           <div className="space-y-4 mt-2">
 
-            {/* Cliente */}
             <div>
               <Label>Empresa</Label>
               <Select value={clienteId} onValueChange={setClienteId}>
                 <SelectTrigger><SelectValue placeholder="Seleccionar empresa" /></SelectTrigger>
                 <SelectContent>
-                  {clientes.map(c => (
-                    <SelectItem key={c.id} value={String(c.id)}>{c.empresa}</SelectItem>
-                  ))}
+                  {clientes.map(c => <SelectItem key={c.id} value={String(c.id)}>{c.empresa}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
 
-            {/* Producto */}
             <div>
               <Label>Producto</Label>
               <Select value={productoId} onValueChange={handleSelectProducto}>
                 <SelectTrigger><SelectValue placeholder="Seleccionar producto" /></SelectTrigger>
                 <SelectContent>
-                  {productos.map(p => (
-                    <SelectItem key={p.id} value={String(p.id)}>{p.nombre}</SelectItem>
-                  ))}
+                  {productos.map(p => <SelectItem key={p.id} value={String(p.id)}>{p.nombre}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
 
-            {/* Variante */}
             {productoId && (
               <div>
                 <Label>Variante</Label>
@@ -265,122 +314,114 @@ export default function Pedidos() {
               </div>
             )}
 
-            {/* Tipo de factura */}
             {varianteId && (
               <div>
                 <Label>Tipo de precio</Label>
                 <div className="flex gap-2 mt-1">
-                  <button
-                    type="button"
-                    onClick={() => handleTipoFactura('sinFactura')}
+                  <button type="button" onClick={() => handleTipoFactura('sinFactura')}
                     className={`flex-1 py-2 px-3 rounded-md border text-sm font-medium transition-colors ${
-                      tipoFactura === 'sinFactura'
-                        ? 'bg-green-600 text-white border-green-600'
-                        : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
-                    }`}
-                  >
+                      tipoFactura === 'sinFactura' ? 'bg-green-600 text-white border-green-600' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                    }`}>
                     Sin factura · Bs. {varianteSeleccionada?.precioSinFactura}
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => handleTipoFactura('conFactura')}
+                  <button type="button" onClick={() => handleTipoFactura('conFactura')}
                     className={`flex-1 py-2 px-3 rounded-md border text-sm font-medium transition-colors ${
-                      tipoFactura === 'conFactura'
-                        ? 'bg-blue-600 text-white border-blue-600'
-                        : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
-                    }`}
-                  >
+                      tipoFactura === 'conFactura' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                    }`}>
                     Con factura · Bs. {varianteSeleccionada?.precioConFactura}
                   </button>
                 </div>
               </div>
             )}
 
-            {/* Cantidad y precio */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label>Cantidad (unidades)</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  value={cantidad}
-                  onChange={e => setCantidad(e.target.value)}
-                />
+                <Label>Cantidad</Label>
+                <Input type="number" min={1} value={cantidad} onChange={e => setCantidad(e.target.value)} />
               </div>
               <div>
                 <Label>Precio unitario (Bs.)</Label>
-                <Input
-                  type="number"
-                  value={precioUnitario}
+                <Input type="number" value={precioUnitario}
                   onChange={e => setPrecioUnitario(e.target.value)}
-                  className={tipoFactura === 'sinFactura' ? 'border-green-300' : 'border-blue-300'}
-                />
+                  className={tipoFactura === 'sinFactura' ? 'border-green-300' : 'border-blue-300'} />
               </div>
             </div>
-
-            {/* Total calculado */}
             {totalCalculado && (
               <div className={`rounded-lg p-3 text-sm font-medium ${
-                tipoFactura === 'sinFactura'
-                  ? 'bg-green-50 text-green-800'
-                  : 'bg-blue-50 text-blue-800'
+                tipoFactura === 'sinFactura' ? 'bg-green-50 text-green-800' : 'bg-blue-50 text-blue-800'
               }`}>
                 Total a pagar: Bs. {totalCalculado}
-                <span className="font-normal text-xs ml-2">
-                  ({cantidad} unidad × Bs. {precioUnitario})
-                </span>
+                <span className="font-normal text-xs ml-2">({cantidad} × Bs. {precioUnitario})</span>
               </div>
             )}
-
-
-            {codigosPreview && (
-              <div className="bg-gray-50 border rounded-md p-3 text-xs space-y-1">
-                <div><strong>Producción:</strong> {codigosPreview.codigoProduccion}</div>
-                <div><strong>Imprenta:</strong> {codigosPreview.codigoImprenta}</div>
-              </div>
-            )}
-
-            {/* Notas */}
             <div>
-              <Label>Notas (opcional)</Label>
-              <Input
-                value={notas}
-                onChange={e => setNotas(e.target.value)}
-                placeholder="Observaciones del pedido"
-              />
+              <Label>Método de pago</Label>
+              <Select value={metodoPago} onValueChange={setMetodoPago}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {METODOS_PAGO.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
 
-            {/* Personalizaciones */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Color tapa</Label>
+                <Select value={colorTapa} onValueChange={setColorTapa}>
+                  <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+                  <SelectContent>
+                    {COLORES_TAPA.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Color adhesivo</Label>
+                <Select value={colorAdhesivo} onValueChange={setColorAdhesivo}>
+                  <SelectTrigger><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+                  <SelectContent>
+                    {COLORES_ADHESIVO.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            {editing && !codigosPreview && (editing.codigoProduccion || editing.codigoImprenta) && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 text-xs space-y-1">
+                <p className="text-yellow-700 font-medium mb-1">Códigos actuales (selecciona colores para regenerar)</p>
+                {editing.codigoProduccion && <p><strong>Producción:</strong> {editing.codigoProduccion}</p>}
+                {editing.codigoImprenta && <p><strong>Imprenta:</strong> {editing.codigoImprenta}</p>}
+              </div>
+            )}
+            {codigosPreview && (
+              <div className="bg-gray-50 border rounded-md p-3 text-xs space-y-1">
+                <p><strong>Producción:</strong> {codigosPreview.codigoProduccion}</p>
+                <p><strong>Imprenta:</strong> {codigosPreview.codigoImprenta}</p>
+              </div>
+            )}
+            <div>
+              <Label>Notas (opcional)</Label>
+              <Input value={notas} onChange={e => setNotas(e.target.value)} placeholder="Observaciones" />
+            </div>
+
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label>Personalizaciones (opcional)</Label>
-                <Button size="sm" variant="outline" onClick={addPersonalizacion}>+ Agregar</Button>
+                <Button className='border-bg-black hover:bg-slate-300 font-bold py-2 px-4 rounded-md' size="sm" variant="outline" onClick={addPersonalizacion}>+ Agregar</Button>
               </div>
               {personalizaciones.map((p, i) => (
                 <div key={i} className="flex gap-2 items-center">
-                  <Input
-                    placeholder="Tipo (ej: color)"
-                    value={p.tipo}
-                    onChange={e => updatePersonalizacion(i, 'tipo', e.target.value)}
-                    className="h-8 text-sm"
-                  />
-                  <Input
-                    placeholder="Valor (ej: rojo)"
-                    value={p.valor}
-                    onChange={e => updatePersonalizacion(i, 'valor', e.target.value)}
-                    className="h-8 text-sm"
-                  />
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="text-red-500 px-2"
-                    onClick={() => removePersonalizacion(i)}
-                  >✕</Button>
+                  <Input placeholder="Tipo" value={p.tipo}
+                    onChange={e => updatePersonalizacion(i, 'tipo', e.target.value)} className="h-8 text-sm" />
+                  <Input placeholder="Valor" value={p.valor}
+                    onChange={e => updatePersonalizacion(i, 'valor', e.target.value)} className="h-8 text-sm" />
+                  <Button size="sm" variant="ghost" className="text-red-500 px-2"
+                    onClick={() => removePersonalizacion(i)}>✕</Button>
                 </div>
               ))}
             </div>
 
-            <Button className="w-full" onClick={handleSubmit}>Crear pedido</Button>
+            <Button className="w-full border-bg-black hover:bg-slate-300 font-bold py-2 px-4 rounded-md" onClick={handleSubmit}>
+              {editing ? 'Guardar cambios' : 'Crear pedido'}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

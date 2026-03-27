@@ -6,7 +6,9 @@ const links = [
   { to: '/productos', label: 'Productos' },
   { to: '/pedidos', label: 'Pedidos' },
   { to: '/seguimiento', label: 'Seguimiento' },
+  { to: '/moviles', label: 'Móviles' },
   { to: '/historial', label: 'Historial' },
+
 ]
 
 export default function Navbar() {

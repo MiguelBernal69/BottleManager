@@ -138,7 +138,9 @@ export default function Productos() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-gray-800">Productos</h1>
-        <Button onClick={openCreateProducto}>+ Nuevo producto</Button>
+        <Button
+        className='bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md'
+        onClick={openCreateProducto}>+ Nuevo producto</Button>
       </div>
 
       <Input
@@ -148,7 +150,7 @@ export default function Productos() {
         className="max-w-xs"
       />
 
-      <Card>
+      <Card className='rounded-lg border'>
         <CardContent className="p-0">
           <table className="w-full text-sm">
             <thead>
@@ -170,13 +172,19 @@ export default function Productos() {
                     </span>
                   </td>
                   <td className="px-4 py-3 flex gap-2">
-                    <Button size="sm" variant="outline" onClick={() => verVariantes(p)}>
+                    <Button 
+                    className='bg-slate-100 hover:bg-slate-300 font-bold py-2 px-4 rounded-md'
+                    size="sm" variant="outline" onClick={() => verVariantes(p)}>
                       Ver variantes
                     </Button>
-                    <Button size="sm" variant="outline" onClick={() => openEditProducto(p)}>
+                    <Button 
+                    className='bg-slate-100 hover:bg-slate-300 font-bold py-2 px-4 rounded-md'
+                    size="sm" variant="outline" onClick={() => openEditProducto(p)}>
                       Editar
                     </Button>
-                    <Button size="sm" variant="destructive" onClick={() => handleDeleteProducto(p.id)}>
+                    <Button 
+                      className='bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-md'
+                      size="sm" variant="destructive" onClick={() => handleDeleteProducto(p.id)}>
                       Eliminar
                     </Button>
                   </td>
@@ -196,7 +204,7 @@ export default function Productos() {
 
       {/* Modal crear/editar producto */}
       <Dialog open={openProducto} onOpenChange={setOpenProducto}>
-        <DialogContent className="bg-white">
+        <DialogContent className="bg-white " >
           <DialogHeader>
             <DialogTitle>{editingProducto ? 'Editar producto' : 'Nuevo producto'}</DialogTitle>
           </DialogHeader>
@@ -217,7 +225,7 @@ export default function Productos() {
                 onChange={e => setFormProducto({ ...formProducto, descripcion: e.target.value })}
               />
             </div>
-            <Button className="w-full mt-2" onClick={handleSubmitProducto}>
+            <Button className="w-full mt-2 border-bg-black hover:bg-slate-300 font-bold py-2 px-4 rounded-md" onClick={handleSubmitProducto}>
               {editingProducto ? 'Guardar cambios' : 'Crear producto'}
             </Button>
           </div>
@@ -226,13 +234,15 @@ export default function Productos() {
 
       {/* Modal panel de variantes */}
       <Dialog open={openVariantes} onOpenChange={setOpenVariantes}>
-        <DialogContent className="bg-white max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="bg-white max-w-3xl max-h-[90vh] overflow-y-auto" size="lg">
           <DialogHeader>
             <DialogTitle>Variantes — {productoSeleccionado?.nombre}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 mt-2">
             <div className="flex justify-end">
-              <Button onClick={openCreateVariante}>+ Nueva variante</Button>
+              <Button 
+                className='bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md'
+                onClick={openCreateVariante}>+ Nueva variante</Button>
             </div>
 
             {productoSeleccionado?.variantes.length === 0 ? (
@@ -262,8 +272,12 @@ export default function Productos() {
                       <td className="px-3 py-2 text-green-700 font-medium">Bs. {v.precioSinFactura}</td>
                       <td className="px-3 py-2 text-blue-700 font-medium">Bs. {v.precioConFactura}</td>
                       <td className="px-3 py-2 flex gap-2">
-                        <Button size="sm" variant="outline" onClick={() => openEditVariante(v)}>Editar</Button>
-                        <Button size="sm" variant="destructive" onClick={() => handleDeleteVariante(v.id)}>Eliminar</Button>
+                        <Button 
+                          className='bg-slate-100 hover:bg-slate-300 font-bold py-2 px-4 rounded-md'
+                          size="sm" variant="outline" onClick={() => openEditVariante(v)}>Editar</Button>
+                        <Button 
+                          className='bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-md'
+                          size="sm" variant="destructive" onClick={() => handleDeleteVariante(v.id)}>Eliminar</Button>
                       </td>
                     </tr>
                   ))}
@@ -294,7 +308,7 @@ export default function Productos() {
                 />
               </div>
             ))}
-            <Button className="w-full mt-2" onClick={handleSubmitVariante}>
+            <Button className="w-full mt-2 border-bg-black hover:bg-slate-300 font-bold py-2 px-4 rounded-md" onClick={handleSubmitVariante}>
               {editingVariante ? 'Guardar cambios' : 'Crear variante'}
             </Button>
           </div>

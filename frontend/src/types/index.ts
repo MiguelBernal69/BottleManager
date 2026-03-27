@@ -1,6 +1,6 @@
-export type Departamento = 'cochabamba' | 'la_paz' | 'santa_cruz' | 'oruro' | 'potosi' | 'tarija' | 'beni' | 'pando' | 'sucre'
+export type DepartamentoE = 'cochabamba' | 'la_paz' | 'santa_cruz' | 'oruro' | 'potosi' | 'tarija' | 'beni' | 'pando' | 'sucre'
 
-export type Pago = 'qr' | 'al_contado' | 'credito'
+export type MetodoPago = 'qr' | 'al_contado' | 'credito'
 
 export interface Cliente {
   id: number
@@ -8,9 +8,27 @@ export interface Cliente {
   nombreCliente?: string
   telefono?: string
   direccion?: string
-  departamento?: Departamento
+  departamento?: DepartamentoE
   createdAt: string
   updatedAt: string
+}
+
+export interface Movil {
+  id: number
+  nombre: string
+  placa?: string
+  activo: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export interface Entrega {
+  id: number
+  pedidoId: number
+  movilId: number
+  fechaSalida: string
+  fechaEntrega?: string
+  movil: Movil
 }
 
 export interface Producto {
@@ -51,14 +69,15 @@ export interface Pedido {
   estado: EstadoPedido
   notas?: string
   totalPagar: number
-  codigoProduccion: string
-  codigoImprenta: string
-  pago?: Pago
+  codigoProduccion?: string
+  codigoImprenta?: string
+  metodoPago?: MetodoPago
   createdAt: string
   updatedAt: string
   cliente: Cliente
   variante: VarianteProducto & { producto: Producto }
   personalizaciones: Personalizacion[]
+  entrega?: Entrega
 }
 
 
@@ -75,11 +94,11 @@ export interface HistorialItem {
   pedidoId: number
   clienteId?: number
   pedidoData: any
-  totalSinFactura: string
-  totalConFactura: string
+  totalPagar?: string
+  totalSinFactura?: string
+  totalConFactura?: string
   estadoFinal: string
   entregadoAt: string
-  clienteNombre?: string
 }
 
 export interface DashboardData {

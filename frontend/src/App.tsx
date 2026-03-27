@@ -6,6 +6,7 @@ import Productos from './pages/Productos'
 import Pedidos from './pages/Pedidos'
 import Seguimiento from './pages/Seguimiento'
 import Historial from './pages/Historial'
+import Moviles from './pages/Moviles'
 
 function App() {
   return (
@@ -20,6 +21,7 @@ function App() {
             <Route path="/productos" element={<Productos />} />
             <Route path="/pedidos" element={<Pedidos />} />
             <Route path="/seguimiento" element={<Seguimiento />} />
+            <Route path="/moviles" element={<Moviles />} />
             <Route path="/historial" element={<Historial />} />
           </Routes>
         </main>

@@ -16,7 +16,7 @@ export default function Navbar() {
     <nav className="bg-white border-b border-gray-200 shadow-sm">
       <div className="max-w-7xl mx-auto px-4">
         <div className="flex items-center gap-1 h-14">
-          <span className="font-semibold text-gray-800 mr-6 text-lg">💧 EmpresaAgua</span>
+          <span className="font-semibold text-gray-800 mr-6 text-xl">💧 VERZASCA</span>
           {links.map(link => (
             <NavLink
               key={link.to}

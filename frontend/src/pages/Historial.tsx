@@ -7,11 +7,8 @@ import api from '../api/axios'
 import type { HistorialItem } from '../types'
 
 const METODO_PAGO_LABELS: Record<string, string> = {
-  qr: 'QR',
-  al_contado: 'Al contado',
-  credito: 'Crédito',
+  qr: 'QR', al_contado: 'Al contado', credito: 'Crédito',
 }
-
 const DEPT_LABELS: Record<string, string> = {
   cochabamba: 'Cochabamba', santa_cruz: 'Santa Cruz', la_paz: 'La Paz',
   oruro: 'Oruro', potosi: 'Potosí', tarija: 'Tarija',
@@ -20,27 +17,50 @@ const DEPT_LABELS: Record<string, string> = {
 
 export default function Historial() {
   const [historial, setHistorial] = useState<HistorialItem[]>([])
+  const [total, setTotal] = useState(0)
+  const [totalPages, setTotalPages] = useState(1)
+  const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
+  const [searchInput, setSearchInput] = useState('')
   const [fechaDesde, setFechaDesde] = useState('')
   const [fechaHasta, setFechaHasta] = useState('')
   const [detalle, setDetalle] = useState<HistorialItem | null>(null)
+  const [loading, setLoading] = useState(false)
 
-  useEffect(() => {
-    api.get('/historial').then(r => setHistorial(r.data))
+  const fetchHistorial = async (p = 1, s = search, d = fechaDesde, h = fechaHasta) => {
+    setLoading(true)
+    try {
+      const params = new URLSearchParams({ page: String(p) })
+      if (s) params.append('search', s)
+      if (d) params.append('desde', d)
+      if (h) params.append('hasta', h)
+      const res = await api.get(`/historial?${params.toString()}`)
+      setHistorial(res.data.data)
+      setTotal(res.data.total)
+      setTotalPages(res.data.totalPages)
+      setPage(res.data.page)
+    } finally {
+      setLoading(false)
+    }
+  }
 
-  }, [])
+  useEffect(() => { fetchHistorial() }, [])
 
-  const filtered = historial.filter(h => {
-    const empresa = (h.pedidoData?.cliente?.empresa ?? '').toLowerCase()
-    const nombreCliente = (h.pedidoData?.cliente?.nombreCliente ?? '').toLowerCase()
-    const matchSearch = empresa.includes(search.toLowerCase()) || nombreCliente.includes(search.toLowerCase())
-    const fecha = new Date(h.entregadoAt)
-    const matchDesde = fechaDesde ? fecha >= new Date(fechaDesde) : true
-    const matchHasta = fechaHasta ? fecha <= new Date(fechaHasta + 'T23:59:59') : true
-    return matchSearch && matchDesde && matchHasta
-  })
+  const handleBuscar = () => {
+    setSearch(searchInput)
+    fetchHistorial(1, searchInput, fechaDesde, fechaHasta)
+  }
 
-  const totalFiltrado = filtered.reduce((acc, h) => acc + Number(h.totalPagar ?? h.totalSinFactura), 0)
+  const handleLimpiar = () => {
+    setSearch(''); setSearchInput(''); setFechaDesde(''); setFechaHasta('')
+    fetchHistorial(1, '', '', '')
+  }
+
+  const handleFechas = () => {
+    fetchHistorial(1, search, fechaDesde, fechaHasta)
+  }
+
+  const totalFiltrado = historial.reduce((acc, h) => acc + Number(h.totalSinFactura ?? 0), 0)
 
   const d = detalle?.pedidoData
 
@@ -48,19 +68,23 @@ export default function Historial() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold text-gray-800">Historial</h1>
-        <span className="text-sm text-gray-500">{filtered.length} entrega(s)</span>
+        <span className="text-sm text-gray-500">{total} entrega(s) en total</span>
       </div>
 
       {/* Filtros */}
       <div className="flex flex-wrap gap-3 items-end">
         <div>
           <p className="text-xs text-gray-500 mb-1">Buscar empresa o contacto</p>
-          <Input
-            placeholder="Buscar..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="w-52"
-          />
+          <div className="flex gap-2">
+            <Input
+              placeholder="Buscar..."
+              value={searchInput}
+              onChange={e => setSearchInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleBuscar()}
+              className="w-48"
+            />
+            <Button size="sm" onClick={handleBuscar}>Buscar</Button>
+          </div>
         </div>
         <div>
           <p className="text-xs text-gray-500 mb-1">Desde</p>
@@ -72,24 +96,24 @@ export default function Historial() {
           <Input type="date" value={fechaHasta}
             onChange={e => setFechaHasta(e.target.value)} className="w-40" />
         </div>
+        <Button size="sm" variant="outline" onClick={handleFechas}>Aplicar fechas</Button>
         {(search || fechaDesde || fechaHasta) && (
-          <Button variant="outline" size="sm"
-            onClick={() => { setSearch(''); setFechaDesde(''); setFechaHasta('') }}>
-            Limpiar
+          <Button size="sm" variant="ghost" className="text-red-500" onClick={handleLimpiar}>
+            Limpiar filtros
           </Button>
         )}
       </div>
 
-      {/* Total filtrado */}
-      {filtered.length > 0 && (
+      {/* Totales de la página actual */}
+      {historial.length > 0 && (
         <div className="flex gap-4">
           <div className="bg-green-50 rounded-lg px-4 py-2 text-sm">
-            <span className="text-gray-500">Total entregas: </span>
+            <span className="text-gray-500">Total página: </span>
             <span className="font-semibold text-green-700">Bs. {totalFiltrado.toFixed(2)}</span>
           </div>
           <div className="bg-blue-50 rounded-lg px-4 py-2 text-sm">
-            <span className="text-gray-500">Cantidad de pedidos: </span>
-            <span className="font-semibold text-blue-700">{filtered.length}</span>
+            <span className="text-gray-500">Página: </span>
+            <span className="font-semibold text-blue-700">{page} de {totalPages}</span>
           </div>
         </div>
       )}
@@ -110,7 +134,19 @@ export default function Historial() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map(h => (
+              {loading ? (
+                <tr>
+                  <td colSpan={8} className="px-4 py-8 text-center text-gray-400">
+                    Cargando...
+                  </td>
+                </tr>
+              ) : historial.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="px-4 py-8 text-center text-gray-400">
+                    No hay entregas
+                  </td>
+                </tr>
+              ) : historial.map(h => (
                 <tr key={h.id} className="border-b last:border-0 hover:bg-gray-50">
                   <td className="px-4 py-3 text-gray-500">
                     {new Date(h.entregadoAt).toLocaleDateString('es-BO')}
@@ -128,7 +164,7 @@ export default function Historial() {
                   </td>
                   <td className="px-4 py-3">{h.pedidoData?.cantidad ?? '—'}</td>
                   <td className="px-4 py-3 font-semibold text-green-700">
-                    Bs. {Number(h.totalPagar ?? h.totalSinFactura).toFixed(2)}
+                    Bs. {Number(h.totalSinFactura ?? 0).toFixed(2)}
                   </td>
                   <td className="px-4 py-3">
                     <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
@@ -137,20 +173,61 @@ export default function Historial() {
                   </td>
                   <td className="px-4 py-3">
                     <Button size="sm" variant="outline" onClick={() => setDetalle(h)}>
-                      Ver detalle
+                      Ver
                     </Button>
                   </td>
                 </tr>
               ))}
-              {filtered.length === 0 && (
-                <tr>
-                  <td colSpan={8} className="px-4 py-6 text-center text-gray-400">
-                    No hay entregas con los filtros aplicados
-                  </td>
-                </tr>
-              )}
             </tbody>
           </table>
+
+          {/* Paginación */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between px-4 py-3 border-t bg-gray-50">
+              <Button
+                size="sm" variant="outline"
+                disabled={page <= 1 || loading}
+                onClick={() => fetchHistorial(page - 1)}
+              >
+                ← Anterior
+              </Button>
+
+              <div className="flex gap-1">
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 1)
+                  .reduce((acc: (number | string)[], p, i, arr) => {
+                    if (i > 0 && (p as number) - (arr[i - 1] as number) > 1) acc.push('...')
+                    acc.push(p)
+                    return acc
+                  }, [])
+                  .map((p, i) =>
+                    p === '...' ? (
+                      <span key={i} className="px-2 py-1 text-gray-400 text-sm">...</span>
+                    ) : (
+                      <button
+                        key={i}
+                        onClick={() => fetchHistorial(p as number)}
+                        className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
+                          p === page
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-white text-gray-600 border border-gray-300 hover:bg-gray-50'
+                        }`}
+                      >
+                        {p}
+                      </button>
+                    )
+                  )}
+              </div>
+
+              <Button
+                size="sm" variant="outline"
+                disabled={page >= totalPages || loading}
+                onClick={() => fetchHistorial(page + 1)}
+              >
+                Siguiente →
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -163,7 +240,6 @@ export default function Historial() {
           {detalle && d && (
             <div className="space-y-4 mt-2 text-sm">
 
-              {/* Cliente */}
               <div>
                 <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">Cliente</p>
                 <div className="bg-gray-50 rounded-lg p-3 space-y-1">
@@ -175,7 +251,6 @@ export default function Historial() {
                 </div>
               </div>
 
-              {/* Producto */}
               <div>
                 <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">Producto</p>
                 <div className="bg-gray-50 rounded-lg p-3 space-y-1">
@@ -187,46 +262,38 @@ export default function Historial() {
                 </div>
               </div>
 
-              {/* Pedido */}
               <div>
                 <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">Pedido</p>
                 <div className="bg-gray-50 rounded-lg p-3 space-y-1">
                   <p><span className="text-gray-500">Cantidad:</span> <span className="font-medium">{d.cantidad} paquetes</span></p>
-                  <p>
-                    <span className="text-gray-500">Total unidades:</span>{' '}
-                    <span className="font-medium">{d.cantidad * (d.variante?.cantidadPaquete ?? 1)}</span>
-                  </p>
+                  <p><span className="text-gray-500">Total unidades:</span> <span className="font-medium">{d.cantidad * (d.variante?.cantidadPaquete ?? 1)}</span></p>
                   <p><span className="text-gray-500">Precio unitario:</span> Bs. {Number(d.precioUnitario).toFixed(2)}</p>
-                  <p>
-                    <span className="text-gray-500">Total pagado:</span>{' '}
-                    <span className="font-semibold text-green-700">
-                      Bs. {Number(detalle.totalPagar ?? detalle.totalSinFactura).toFixed(2)}
-                    </span>
-                  </p>
-                  <p>
-                    <span className="text-gray-500">Método de pago:</span>{' '}
-                    <span className="font-medium">{METODO_PAGO_LABELS[d.metodoPago ?? ''] ?? '—'}</span>
-                  </p>
+                  <p><span className="text-gray-500">Total pagado:</span> <span className="font-semibold text-green-700">Bs. {Number(detalle.totalSinFactura ?? 0).toFixed(2)}</span></p>
+                  <p><span className="text-gray-500">Método de pago:</span> <span className="font-medium">{METODO_PAGO_LABELS[d.metodoPago ?? ''] ?? '—'}</span></p>
                   {d.notas && <p><span className="text-gray-500">Notas:</span> {d.notas}</p>}
                 </div>
               </div>
 
-              {/* Códigos */}
               {(d.codigoProduccion || d.codigoImprenta) && (
                 <div>
                   <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">Códigos</p>
                   <div className="bg-gray-50 rounded-lg p-3 space-y-1">
-                    {d.codigoProduccion && (
-                      <p><span className="text-gray-500">Producción:</span> <span className="font-mono text-xs">{d.codigoProduccion}</span></p>
-                    )}
-                    {d.codigoImprenta && (
-                      <p><span className="text-gray-500">Imprenta:</span> <span className="font-mono text-xs">{d.codigoImprenta}</span></p>
-                    )}
+                    {d.codigoProduccion && <p><span className="text-gray-500">Producción:</span> <span className="font-mono text-xs">{d.codigoProduccion}</span></p>}
+                    {d.codigoImprenta && <p><span className="text-gray-500">Imprenta:</span> <span className="font-mono text-xs">{d.codigoImprenta}</span></p>}
                   </div>
                 </div>
               )}
 
-              {/* Personalizaciones */}
+              {(d.codigoProduccion || d.codigoImprenta) && (
+                <div>
+                  <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">Códigos</p>
+                  <div className="bg-gray-50 rounded-lg p-3 space-y-1">
+                    {d.codigoProduccion && <p><span className="text-gray-500">Nombre Movil: </span> <span className="font-mono text-xs">{d.entrega.movil.nombre}</span></p>}
+                    {d.codigoImprenta && <p><span className="text-gray-500">Placa Movil: </span> <span className="font-mono text-xs">{d.entrega.movil.placa}</span></p>}
+                  </div>
+                </div>
+              )}
+
               {d.personalizaciones?.length > 0 && (
                 <div>
                   <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">Personalizaciones</p>
@@ -238,7 +305,6 @@ export default function Historial() {
                 </div>
               )}
 
-              {/* Entrega */}
               <div>
                 <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">Entrega</p>
                 <div className="bg-gray-50 rounded-lg p-3 space-y-1">

@@ -1,14 +1,20 @@
 import { Request, Response } from 'express'
 import prisma from '../db/prisma'
 
-export const getSummary = async (_req: Request, res: Response) => {
+export const getSummary = async (req: Request, res: Response) => {
   try {
+    const { desde, hasta } = req.query
+
+    // Rango de fechas para historial
+    const fechaDesde = desde ? new Date(desde as string) : new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+    const fechaHasta = hasta ? new Date((hasta as string) + 'T23:59:59') : new Date()
     const [
       totalClientes,
       totalPedidos,
       pedidosPorEstado,
       pedidosRecientes,
       totalHistorial,
+      historialFiltrado,
       historialCompleto,
     ] = await Promise.all([
       prisma.cliente.count(),
@@ -21,55 +27,76 @@ export const getSummary = async (_req: Request, res: Response) => {
           cliente: true,
           variante: { include: { producto: true } },
           personalizaciones: true,
+          entrega: { include: { movil: true } },
         },
       }),
       prisma.historialPedido.count(),
+      prisma.historialPedido.findMany({
+        where: {
+          entregadoAt: { gte: fechaDesde, lte: fechaHasta },
+        },
+        orderBy: { entregadoAt: 'desc' },
+      }),
       prisma.historialPedido.findMany({
         orderBy: { entregadoAt: 'desc' },
       }),
     ])
 
-    const ingresoTotalSinFactura = historialCompleto.reduce(
-      (acc, h) => acc + Number(h.totalSinFactura), 0
-    )
-    const ingresoTotalConFactura = historialCompleto.reduce(
-      (acc, h) => acc + Number(h.totalConFactura), 0
+  
+    // Ingresos del rango filtrado
+    const ingresoFiltrado = historialFiltrado.reduce((acc, h) => {
+      const data = h.pedidoData as { totalPagar?: string }
+      const total = parseFloat(data.totalPagar || "0")
+      return acc + total
+    }, 0
     )
 
-    const ingresosPorMes: Record<string, { sinFactura: number; conFactura: number }> = {}
+
+    const ingresoTotal = historialCompleto.reduce((acc, h) => {
+      const data = h.pedidoData as { totalPagar?: string }
+      const total = parseFloat(data.totalPagar || "0")
+      return acc + total
+    }, 0)
+
+    // Ingresos por mes (últimos 6 meses del historial completo)
+    const ingresosPorMes: Record<string, number> = {}
     historialCompleto.forEach(h => {
       const fecha = new Date(h.entregadoAt)
       const key = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}`
-      if (!ingresosPorMes[key]) ingresosPorMes[key] = { sinFactura: 0, conFactura: 0 }
-      ingresosPorMes[key].sinFactura += Number(h.totalSinFactura)
-      ingresosPorMes[key].conFactura += Number(h.totalConFactura)
+      if (!ingresosPorMes[key]) ingresosPorMes[key] = 0
+      ingresosPorMes[key] += Number(h.pedidoData ?? 0)
     })
 
     const graficoIngresos = Object.entries(ingresosPorMes)
       .sort(([a], [b]) => a.localeCompare(b))
       .slice(-6)
-      .map(([mes, valores]) => ({
+      .map(([mes, total]) => ({
         mes,
-        sinFactura: Number(valores.sinFactura.toFixed(2)),
-        conFactura: Number(valores.conFactura.toFixed(2)),
+        total: Number(total.toFixed(2)),
       }))
 
-    // Últimas 5 entregas con datos del cliente desde pedidoData
+    // Últimas 5 entregas
     const ultimasEntregas = historialCompleto.slice(0, 5).map(h => ({
       ...h,
-      clienteNombre: (h.pedidoData as any)?.cliente?.nombre ?? '—',
+      empresa: (h.pedidoData as any)?.cliente?.empresa ?? '—',
+      productoNombre: (h.pedidoData as any)?.variante?.producto?.nombre ?? '—',
+      varianteTamano: (h.pedidoData as any)?.variante?.tamanoMl ?? '—',
     }))
 
     res.json({
       totalClientes,
       totalPedidos,
+      totalHistorial,
+      ingresoFiltrado: Number(ingresoFiltrado.toFixed(2)),
+      ingresoTotal: Number(ingresoTotal.toFixed(2)),
       pedidosPorEstado,
       pedidosRecientes,
-      totalHistorial,
-      ingresoTotalSinFactura: Number(ingresoTotalSinFactura.toFixed(2)),
-      ingresoTotalConFactura: Number(ingresoTotalConFactura.toFixed(2)),
       graficoIngresos,
       ultimasEntregas,
+      rangoFiltro: {
+        desde: fechaDesde.toISOString(),
+        hasta: fechaHasta.toISOString(),
+      },
     })
   } catch (e) {
     console.error(e)
